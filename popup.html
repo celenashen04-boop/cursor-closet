@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Cursor Closet</title>
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="pop-head">
+    <div class="brand"><img src="icons/icon-32.png" width="22" height="22" alt=""> Cursor Closet</div>
+    <label class="switch" title="Turn custom cursors on or off">
+      <input id="enabled" type="checkbox" role="switch" aria-label="Custom cursors on">
+      <span></span>
+    </label>
+  </header>
+  <p class="status note" id="status"></p>
+  <ul class="sets" id="sets"></ul>
+  <footer class="pop-foot">
+    <button class="btn btn-ghost" id="manage" type="button">Manage sets</button>
+    <button class="btn btn-primary" id="add" type="button">+ Upload new</button>
+  </footer>
+  <script src="lib.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
