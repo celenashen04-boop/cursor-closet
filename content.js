@@ -1,16 +1,20 @@
 // Applies the active Cursor Closet set to every page and frame.
 //
-// Pages decide per element whether the cursor is an arrow, a pointing hand, a resize
-// handle, etc. When the mouse enters an element we read that native cursor once and tag
-// the element as default ("d"), hover ("h") or text field ("t"). A single stylesheet then
-// maps those tags to the uploaded images. Meaningful native cursors (resize, grab, wait…)
-// are left alone.
+// One stylesheet gives every element the uploaded default cursor right away, so the
+// native arrow never flashes through. The first time the mouse enters an element we
+// briefly lift our rule from it (and its untagged ancestors), read the cursor the page
+// wants, and tag it: hover ("h") for clickable things, text field ("t"), native ("n") for
+// cursors that carry meaning (resize, grab, wait…), or default ("d"). This all happens
+// inside the event, before the next paint.
 (() => {
-  if (window.__cursorCloset) return;
-  window.__cursorCloset = true;
+  // A copy injected earlier (e.g. before the extension was reloaded) cleans up first.
+  window.__cursorCloset?.teardown?.();
+  document.querySelectorAll('style#cursor-closet').forEach((el) => el.remove());
 
-  const MARK = 'data-cursor-closet';
-  const DOWN = 'data-cursor-closet-down';
+  const MARK = 'data-cc';
+  const PROBE = 'data-cc-probe';
+  const ON = 'data-cc-on';
+  const DOWN = 'data-cc-down';
   // Two :not(#id) clauses add id-level specificity so page rules can't outrank ours.
   const BOOST = ':not(#cc-a):not(#cc-b)';
   const NATIVE = /^(none|context-menu|help|progress|wait|cell|crosshair|alias|copy|move|no-drop|not-allowed|grab|grabbing|all-scroll|zoom-in|zoom-out|[a-z-]*resize)$/;
@@ -36,13 +40,15 @@
   }
 
   function buildCss(a) {
+    const on = `html[${ON}]`;
+    const plain = `:not([${PROBE}]):not([${MARK}="h"]):not([${MARK}="t"]):not([${MARK}="n"])`;
     const rules = [
-      `[${MARK}="d"]${BOOST} { ${cursorDecl(a.default, 'default')} }`,
-      `[${MARK}="h"]${BOOST} { ${cursorDecl(a.hover || a.default, 'pointer')} }`,
-      `[${MARK}="t"]${BOOST} { cursor: text !important }`,
+      `${on}${BOOST}, ${on} *${plain}${BOOST} { ${cursorDecl(a.default, 'default')} }`,
+      `${on} [${MARK}="h"]:not([${PROBE}])${BOOST} { ${cursorDecl(a.hover || a.default, 'pointer')} }`,
+      `${on} [${MARK}="t"]:not([${PROBE}])${BOOST} { cursor: text !important }`,
     ];
     if (a.click) {
-      const pressed = `html[${DOWN}][${MARK}]:not([${MARK}="t"])${BOOST}, html[${DOWN}] [${MARK}]:not([${MARK}="t"])${BOOST}`;
+      const pressed = `${on}[${DOWN}]${BOOST}, ${on}[${DOWN}] *:not([${PROBE}]):not([${MARK}="t"]):not([${MARK}="n"])${BOOST}`;
       rules.push(`${pressed} { ${cursorDecl(a.click, 'default')} }`);
     }
     return rules.join('\n');
@@ -53,28 +59,34 @@
     return el.localName === 'input' && TEXT_INPUT.test(el.type);
   }
 
+  // Reads the cursor the page itself would show, with our rule lifted from this element.
   function classify(el) {
+    el.setAttribute(PROBE, '');
     const cursor = getComputedStyle(el).cursor;
+    el.removeAttribute(PROBE);
+
     if (cursor === 'pointer') return 'h';
     if (isEditable(el) && (cursor === 'auto' || cursor === 'text' || cursor.includes('url('))) {
       return keepText ? 't' : 'd';
     }
     const fallback = el.closest(CLICKABLE) ? 'h' : 'd';
     if (cursor.includes('url(')) {
-      // Usually inherited from an element we already tagged; otherwise the site's own image.
+      // Inherited from an ancestor we tagged (or the site's own image cursor).
       const owner = el.parentElement?.closest(`[${MARK}]`);
       return owner?.getAttribute(MARK) === 'h' ? 'h' : fallback;
     }
-    if (cursor === 'text' || cursor === 'vertical-text') return keepText ? null : 'd';
-    if (NATIVE.test(cursor)) return null;
+    if (cursor === 'text' || cursor === 'vertical-text') return keepText ? 'n' : 'd';
+    if (NATIVE.test(cursor)) return 'n';
     return fallback;
   }
 
   function onOver(e) {
-    const el = e.target;
-    if (!active || el?.nodeType !== 1 || el.hasAttribute(MARK)) return;
-    const kind = classify(el);
-    if (kind) el.setAttribute(MARK, kind);
+    const target = e.target;
+    if (!active || target?.nodeType !== 1 || target.hasAttribute(MARK)) return;
+    // Tag untagged ancestors top-down first, so children see what their parents really are.
+    const chain = [];
+    for (let el = target; el && el !== root && !el.hasAttribute(MARK); el = el.parentElement) chain.push(el);
+    for (let i = chain.length - 1; i >= 0; i--) chain[i].setAttribute(MARK, classify(chain[i]));
   }
 
   function onDown(e) {
@@ -85,22 +97,27 @@
     root.removeAttribute(DOWN);
   }
 
+  function clearTags() {
+    for (const el of document.querySelectorAll(`[${MARK}]`)) el.removeAttribute(MARK);
+  }
+
   function apply(enabled, next) {
     const nextKeepText = next?.keepTextCursor !== false;
     if (nextKeepText !== keepText) {
       // Text-field tags depend on this setting, so start over.
-      for (const el of document.querySelectorAll(`[${MARK}]`)) el.removeAttribute(MARK);
+      clearTags();
       keepText = nextKeepText;
     }
     active = enabled && next?.default ? next : null;
     onUp();
     if (!active) {
+      root.removeAttribute(ON);
       style.remove();
       return;
     }
     style.textContent = buildCss(active);
     attachStyle();
-    root.setAttribute(MARK, 'd');
+    root.setAttribute(ON, '');
   }
 
   function attachStyle() {
@@ -108,25 +125,48 @@
   }
 
   async function load() {
+    // After the extension is reloaded, this copy loses access; step aside for the new one.
+    if (!chrome.runtime?.id) return teardown();
     try {
       const { enabled = true, active: next = null } = await chrome.storage.local.get(['enabled', 'active']);
       apply(enabled, next);
     } catch {
-      // The extension was reloaded or removed; this page keeps whatever it had.
+      teardown();
     }
   }
 
-  addEventListener('mouseover', onOver, { capture: true, passive: true });
-  addEventListener('pointerdown', onDown, { capture: true, passive: true });
-  for (const type of ['pointerup', 'pointercancel', 'dragstart', 'blur']) {
-    addEventListener(type, onUp, { capture: true, passive: true });
+  function onStorage(changes, area) {
+    if (area === 'local' && ('enabled' in changes || 'active' in changes)) load();
   }
+
+  const opts = { capture: true, passive: true };
+  const upEvents = ['pointerup', 'pointercancel', 'dragstart', 'blur'];
+
+  function teardown() {
+    removeEventListener('mouseover', onOver, opts);
+    removeEventListener('pointerdown', onDown, opts);
+    for (const type of upEvents) removeEventListener(type, onUp, opts);
+    document.removeEventListener('DOMContentLoaded', attachStyle);
+    removeEventListener('load', attachStyle);
+    try {
+      chrome.storage.onChanged.removeListener(onStorage);
+    } catch {
+      // Already disconnected.
+    }
+    style.remove();
+    root.removeAttribute(ON);
+    root.removeAttribute(DOWN);
+    clearTags();
+    if (window.__cursorCloset?.teardown === teardown) delete window.__cursorCloset;
+  }
+
+  window.__cursorCloset = { teardown };
+  addEventListener('mouseover', onOver, opts);
+  addEventListener('pointerdown', onDown, opts);
+  for (const type of upEvents) addEventListener(type, onUp, opts);
   // Some sites rebuild <head> while loading; put the stylesheet back if it gets dropped.
   document.addEventListener('DOMContentLoaded', attachStyle);
   addEventListener('load', attachStyle);
-
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && ('enabled' in changes || 'active' in changes)) load();
-  });
+  chrome.storage.onChanged.addListener(onStorage);
   load();
 })();
