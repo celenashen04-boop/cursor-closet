@@ -99,7 +99,7 @@
 .chip:hover:not(:disabled) { border-color: var(--ink); }
 .chip:disabled { opacity: 0.45; cursor: not-allowed; }
 .chip.danger:hover,
-.btn.danger:hover { border-color: #d93a1a; color: #d93a1a; }
+.btn.danger:hover { border-color: var(--accent); color: var(--accent); }
 .chip svg, .btn svg { flex: none; }
 .chip.icon-only { width: 26px; padding: 0; justify-content: center; }
 
@@ -135,9 +135,9 @@
   border-radius: 20px;
   background: var(--bg);
   color: var(--ink);
-  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 30px 80px -20px rgba(var(--ink-rgb), 0.45);
 }
-.editor-dialog::backdrop { background: rgba(23, 22, 21, 0.45); backdrop-filter: blur(2px); }
+.editor-dialog::backdrop { background: rgba(var(--ink-rgb), 0.45); backdrop-filter: blur(2px); }
 .editor-dialog[open] { animation: pop-in 0.18s ease-out; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } }
 

@@ -1,37 +1,26 @@
+/* Tomato Ink: three colors (white, ink, tomato). Everything else is a tint of ink or tomato. */
 :root {
-  color-scheme: light dark;
-  --bg: #f3f0e9;
-  --surface: #fffdf8;
-  --raised: #ffffff;
-  --ink: #171615;
-  --muted: #7a756c;
-  --line: #e2ddd2;
-  --line-strong: #cfc8ba;
-  --accent: #ff5b2e;
-  --accent-ink: #ffffff;
-  --accent-soft: #ffe6dc;
-  --check-a: #ffffff;
-  --check-b: #ece8df;
-  --shadow: 0 1px 0 rgba(23, 22, 21, 0.04), 0 8px 24px -12px rgba(23, 22, 21, 0.18);
+  color-scheme: light;
+  --white: #ffffff;
+  --ink-rgb: 23, 22, 21;
+  --tomato-rgb: 242, 84, 45;
+
+  --bg: var(--white);
+  --surface: var(--white);
+  --raised: var(--white);
+  --ink: rgb(var(--ink-rgb));
+  --muted: rgba(var(--ink-rgb), 0.6);
+  --line: rgba(var(--ink-rgb), 0.12);
+  --line-strong: rgba(var(--ink-rgb), 0.24);
+  --accent: rgb(var(--tomato-rgb));
+  --accent-ink: var(--white);
+  --accent-soft: rgba(var(--tomato-rgb), 0.1);
+  --check-a: var(--white);
+  --check-b: rgba(var(--ink-rgb), 0.06);
+  --shadow: 0 1px 0 rgba(var(--ink-rgb), 0.04), 0 8px 24px -12px rgba(var(--ink-rgb), 0.18);
   --radius: 14px;
   --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121110;
-    --surface: #1b1a18;
-    --raised: #242320;
-    --ink: #f3f0e9;
-    --muted: #9b958b;
-    --line: #2f2d2a;
-    --line-strong: #45423d;
-    --accent-soft: #3b1e14;
-    --check-a: #2a2826;
-    --check-b: #222120;
-    --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
-  }
 }
 
 * { box-sizing: border-box; }
@@ -113,8 +102,8 @@ button { cursor: pointer; }
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(var(--ink-rgb), 0.25);
   transition: transform 0.2s;
 }
 .switch input:checked + span { background: var(--accent); }

@@ -65,7 +65,7 @@ body { width: 320px; }
   content: "";
   width: 8px;
   height: 5px;
-  border: 2px solid #fff;
+  border: 2px solid var(--white);
   border-top: 0;
   border-right: 0;
   transform: translateY(-1px) rotate(-45deg);
